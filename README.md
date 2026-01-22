@@ -51,7 +51,8 @@ Ensure you have the following installed:
 |-- N_Step_SCAN.java               # N-Step SCAN implementation
 |-- Request.java                   # Request class with cylinder and arrival time
 |-- WorkloadGenerator.java         # Workload generator with distributions
-|-- Main.java                      # Entry point for the application
+|-- Main.java                      # Entry point for CLI application
+|-- DiskSchedulerGUI.java          # Swing-based graphical user interface
 |-- .gitignore                     # Git ignore file for .class files
 ```
 
@@ -71,14 +72,65 @@ Ensure you have the following installed:
    ```
 
 3. **Run the Program**:
-   Execute the program using the `java` command:
+   Execute the command-line program using:
    ```bash
    java Main
    ```
 
+4. **Run the Graphical User Interface (GUI)**:
+   Launch the Swing-based GUI application:
+   ```bash
+   java DiskSchedulerGUI
+   ```
+
 ---
 
-## Usage
+## Graphical User Interface (GUI)
+
+The simulator includes a Java Swing-based GUI for easy interaction without command-line arguments.
+
+### Features
+- **Input Fields**: Configure disk bounds (lower/upper cylinder), initial head position, and request list
+- **Direction Selection**: Dropdown to select initial head movement direction (LEFT/RIGHT)
+- **Algorithm Selection**: Dropdown to choose from all 8 scheduling algorithms
+- **Run Simulation**: Execute the selected algorithm with one click
+- **Results Display**: View total head movement, seek statistics, service order, and head path
+
+### GUI Screenshot Layout
+```
++------------------------------------------------------------------+
+|                 Disk Scheduling Algorithms Simulator              |
++------------------------------------------------------------------+
+| Configuration:                                                    |
+|   Lower Cylinder Bound: [0    ]  Upper Cylinder Bound: [4999   ]  |
+|   Initial Head Position: [1000 ]  Initial Direction: [RIGHT ▼]   |
+|   Algorithm: [FCFS                                           ▼]  |
+|   Request List: [2069, 98, 183, 37, 122, 14, 124, 65, 67...]     |
++------------------------------------------------------------------+
+| Simulation Results:                                               |
+|   ╔════════════════════════════════════════════════════════════╗  |
+|   ║         DISK SCHEDULING SIMULATION RESULTS                 ║  |
+|   ╠════════════════════════════════════════════════════════════╣  |
+|   ║   ★ TOTAL HEAD MOVEMENT: 12582                             ║  |
+|   ║   Average Seek Distance: 699.00                            ║  |
+|   ║   Service Order: [2069, 98, 183, ...]                      ║  |
+|   ╚════════════════════════════════════════════════════════════╝  |
++------------------------------------------------------------------+
+|        [Run Simulation]  [Clear Results]  [Reset Defaults]        |
++------------------------------------------------------------------+
+```
+
+### Using the GUI
+1. **Set Cylinder Bounds**: Enter the lower and upper cylinder bounds for the disk
+2. **Set Initial Position**: Enter the starting position of the disk head
+3. **Select Direction**: Choose LEFT or RIGHT for initial head movement direction
+4. **Select Algorithm**: Choose one of the 8 available scheduling algorithms
+5. **Enter Requests**: Type comma or space-separated cylinder numbers
+6. **Click "Run Simulation"**: View the results in the output area
+
+---
+
+## Usage (Command-Line)
 ### Command-Line Arguments
 You can pass the following arguments to customize the simulation:
 
