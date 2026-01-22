@@ -32,6 +32,13 @@ public class Main {
         
         // Algorithm selection
         Set<String> selectedAlgorithms = new HashSet<>(); // Empty = all
+        
+        // Output options
+        boolean showTimeline = false;
+        boolean showSimpleTimeline = false;
+        boolean showServiceOrder = false;
+        boolean showPath = false;
+        boolean quietMode = false;  // Suppress per-service logging
 
         // Parse command-line arguments
         for (int i = 0; i < args.length; i++) {
@@ -128,6 +135,29 @@ public class Main {
                             System.out.println("  " + algo);
                         }
                         return;
+                    // Output options
+                    case "--timeline":
+                        showTimeline = true;
+                        break;
+                    case "--simple-timeline":
+                        showSimpleTimeline = true;
+                        break;
+                    case "--show-order":
+                        showServiceOrder = true;
+                        break;
+                    case "--show-path":
+                        showPath = true;
+                        break;
+                    case "-q":
+                    case "--quiet":
+                        quietMode = true;
+                        break;
+                    case "-v":
+                    case "--verbose":
+                        showTimeline = true;
+                        showServiceOrder = true;
+                        showPath = true;
+                        break;
                     case "-h":
                     case "--help":
                         printHelp();
@@ -224,15 +254,45 @@ public class Main {
         logger.info("  Algorithms: " + selectedAlgorithms);
         logger.info("\n==============================================");
 
+        // Create simulation config
+        SimulationConfig simConfig = SimulationConfig.builder()
+            .diskConfig(config)
+            .verbose(!quietMode)
+            .recordPath(true)
+            .recordTiming(timeBasedMode)
+            .nStepSize(nStepSize)
+            .build();
+        
+        // Create output options
+        OutputOptions outputOpts = new OutputOptions(showTimeline, showSimpleTimeline, 
+                                                      showServiceOrder, showPath);
+
         if (isBatchMode) {
-            batchExecution(nStepSize, config, selectedAlgorithms);
+            batchExecution(simConfig, selectedAlgorithms, outputOpts);
         } else if (timeBasedMode && generatedRequests != null) {
-            executeAlgorithmsTimeBased(generatedRequests, initialPosition, nStepSize, config, selectedAlgorithms);
+            executeAlgorithmsTimeBased(generatedRequests, initialPosition, simConfig, selectedAlgorithms, outputOpts);
         } else {
-            executeAlgorithms(requests, initialPosition, nStepSize, config, selectedAlgorithms);
+            executeAlgorithms(requests, initialPosition, simConfig, selectedAlgorithms, outputOpts);
         }
 
         logger.info("Simulation Complete.");
+    }
+    
+    /**
+     * Simple class to hold output options.
+     */
+    static class OutputOptions {
+        final boolean showTimeline;
+        final boolean showSimpleTimeline;
+        final boolean showServiceOrder;
+        final boolean showPath;
+        
+        OutputOptions(boolean timeline, boolean simpleTl, boolean order, boolean path) {
+            this.showTimeline = timeline;
+            this.showSimpleTimeline = simpleTl;
+            this.showServiceOrder = order;
+            this.showPath = path;
+        }
     }
     
     private static boolean isValidAlgorithm(String name) {
@@ -276,6 +336,14 @@ public class Main {
         System.out.println("  --time-based               Enable time-based scheduling mode");
         System.out.println("  -n, --n-step <n>           Step size for N-Step SCAN (default: 4)");
         System.out.println();
+        System.out.println("Output Options:");
+        System.out.println("  --timeline             Show ASCII timeline visualization");
+        System.out.println("  --simple-timeline      Show simple inline timeline");
+        System.out.println("  --show-order           Show service order");
+        System.out.println("  --show-path            Show full head path");
+        System.out.println("  -q, --quiet            Suppress per-service logging");
+        System.out.println("  -v, --verbose          Show all output (timeline, order, path)");
+        System.out.println();
         System.out.println("Examples:");
         System.out.println("  java Main -r 100 200 300 400 -i 250");
         System.out.println("  java Main -g -s 12345 -d NORMAL -c 30");
@@ -283,23 +351,33 @@ public class Main {
         System.out.println("  java Main -a SCAN C_SCAN LOOK -r 100 200 300");
         System.out.println("  java Main --wrap FIRST -a C_LOOK -r 100 500 200");
         System.out.println("  java Main -g -s 42 -d HOTSPOT -c 25 -t 1000");
+        System.out.println("  java Main -r 100 200 800 -i 500 --timeline --show-order");
+        System.out.println("  java Main -r 100 500 200 -q --simple-timeline");
     }
 
     private static void executeAlgorithms(List<Integer> requests, int initialPosition, 
-                                          int nStepSize, DiskConfig config, Set<String> selected) {
+                                          SimulationConfig simConfig, Set<String> selected,
+                                          OutputOptions outputOpts) {
         List<DiskSchedulingAlgorithm> algorithms = createAlgorithms(
-            requests, null, initialPosition, nStepSize, config, selected, false);
+            requests, null, initialPosition, simConfig, selected, false);
 
+        List<AlgorithmResult> results = new ArrayList<>();
+        
         for (DiskSchedulingAlgorithm algorithm : algorithms) {
-            int movement = algorithm.execute();
-            String name = getAlgorithmDisplayName(algorithm);
-            logger.info(name + " Total Movement: " + movement);
-            logger.info("\n----------------------------------------------");
+            AlgorithmResult result = algorithm.executeWithResult();
+            results.add(result);
+            displayResult(result, outputOpts);
+        }
+        
+        // Display comparison summary
+        if (results.size() > 1) {
+            displayComparisonSummary(results);
         }
     }
     
     private static void executeAlgorithmsTimeBased(List<Request> requests, int initialPosition, 
-                                                    int nStepSize, DiskConfig config, Set<String> selected) {
+                                                    SimulationConfig simConfig, Set<String> selected,
+                                                    OutputOptions outputOpts) {
         List<Integer> cylinders = new ArrayList<>();
         for (Request req : requests) {
             cylinders.add(req.getCylinder());
@@ -310,21 +388,93 @@ public class Main {
         logger.info("");
         
         List<DiskSchedulingAlgorithm> algorithms = createAlgorithms(
-            cylinders, requests, initialPosition, nStepSize, config, selected, true);
+            cylinders, requests, initialPosition, simConfig, selected, true);
 
+        List<AlgorithmResult> results = new ArrayList<>();
+        
         for (DiskSchedulingAlgorithm algorithm : algorithms) {
-            int movement = algorithm.execute();
-            String name = getAlgorithmDisplayName(algorithm);
-            logger.info(name + " Total Movement: " + movement);
-            logger.info("\n----------------------------------------------");
+            AlgorithmResult result = algorithm.executeWithResult();
+            results.add(result);
+            displayResult(result, outputOpts);
         }
+        
+        // Display comparison summary
+        if (results.size() > 1) {
+            displayComparisonSummary(results);
+        }
+    }
+    
+    private static void displayResult(AlgorithmResult result, OutputOptions opts) {
+        String name = result.getAlgorithmName();
+        
+        // Basic result
+        logger.info(name + " Total Movement: " + result.getTotalMovement());
+        logger.info("  Average Seek: " + String.format("%.2f", result.getAverageSeekDistance()) + " cylinders");
+        
+        // Optional outputs
+        if (opts.showServiceOrder) {
+            logger.info("  Service Order: " + result.getServiceOrder());
+        }
+        
+        if (opts.showPath) {
+            logger.info("  Head Path: " + result.getHeadPath());
+        }
+        
+        if (opts.showSimpleTimeline) {
+            logger.info("  " + result.getSimpleTimeline());
+        }
+        
+        if (opts.showTimeline) {
+            System.out.println(result.getAsciiTimeline());
+        }
+        
+        logger.info("\n----------------------------------------------");
+    }
+    
+    private static void displayComparisonSummary(List<AlgorithmResult> results) {
+        logger.info("\n╔══════════════════════════════════════════════════════════════╗");
+        logger.info("║                    COMPARISON SUMMARY                        ║");
+        logger.info("╠══════════════════════════════════════════════════════════════╣");
+        
+        // Find best algorithm
+        AlgorithmResult best = results.get(0);
+        for (AlgorithmResult r : results) {
+            if (r.getTotalMovement() < best.getTotalMovement()) {
+                best = r;
+            }
+        }
+        
+        // Display table
+        logger.info(String.format("║ %-20s │ %10s │ %10s │ %8s ║", 
+                    "Algorithm", "Movement", "Avg Seek", "vs Best"));
+        logger.info("╟──────────────────────┼────────────┼────────────┼──────────╢");
+        
+        for (AlgorithmResult r : results) {
+            String vsPercent;
+            if (r == best) {
+                vsPercent = "BEST";
+            } else {
+                double pct = ((double) r.getTotalMovement() / best.getTotalMovement() - 1) * 100;
+                vsPercent = String.format("+%.1f%%", pct);
+            }
+            
+            logger.info(String.format("║ %-20s │ %10d │ %10.2f │ %8s ║",
+                        r.getAlgorithmName(),
+                        r.getTotalMovement(),
+                        r.getAverageSeekDistance(),
+                        vsPercent));
+        }
+        
+        logger.info("╚══════════════════════════════════════════════════════════════╝");
     }
     
     private static List<DiskSchedulingAlgorithm> createAlgorithms(
             List<Integer> cylinders, List<Request> requests, int initialPosition,
-            int nStepSize, DiskConfig config, Set<String> selected, boolean timeBasedMode) {
+            SimulationConfig simConfig, Set<String> selected, boolean timeBasedMode) {
         
         List<DiskSchedulingAlgorithm> algorithms = new ArrayList<>();
+        DiskConfig config = simConfig.getDiskConfig();
+        int nStepSize = simConfig.getNStepSize();
         
         if (selected.contains("FCFS")) {
             algorithms.add(new FCFS(cylinders, initialPosition, config));
@@ -373,7 +523,7 @@ public class Main {
         return name;
     }
 
-    private static void batchExecution(int nStepSize, DiskConfig config, Set<String> selected) {
+    private static void batchExecution(SimulationConfig simConfig, Set<String> selected, OutputOptions outputOpts) {
         List<Integer> batchInitialPositions = Arrays.asList(100, 500, 1000, 2000);
         List<List<Integer>> batchRequests = Arrays.asList(
                 Arrays.asList(100, 300, 600, 900),
@@ -386,7 +536,7 @@ public class Main {
         for (int initialPosition : batchInitialPositions) {
             for (List<Integer> requests : batchRequests) {
                 logger.info("Batch " + batchCounter + ": Initial Position: " + initialPosition + ", Requests: " + requests);
-                executeAlgorithms(requests, initialPosition, nStepSize, config, selected);
+                executeAlgorithms(requests, initialPosition, simConfig, selected, outputOpts);
                 logger.info("\n==============================================");
                 batchCounter++;
             }
