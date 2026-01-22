@@ -24,8 +24,16 @@ public class FSCAN extends DiskSchedulingAlgorithm {
         super(requests, initialPosition);
     }
     
+    public FSCAN(List<Integer> requests, int initialPosition, DiskConfig config) {
+        super(requests, initialPosition, config);
+    }
+    
     public FSCAN(List<Request> requests, int initialPosition, boolean timeBasedMode) {
         super(requests, initialPosition, timeBasedMode);
+    }
+    
+    public FSCAN(List<Request> requests, int initialPosition, boolean timeBasedMode, DiskConfig config) {
+        super(requests, initialPosition, timeBasedMode, config);
     }
 
     @Override
@@ -141,7 +149,6 @@ public class FSCAN extends DiskSchedulingAlgorithm {
      */
     private int processSCANTimeBased(List<Request> activeQueue, List<Request> holdingQueue,
                                       List<Request> pendingRequests, int startPosition) {
-        // Convert to cylinders and sort
         List<Integer> leftRequests = new ArrayList<>();
         List<Integer> rightRequests = new ArrayList<>();
         
@@ -157,22 +164,22 @@ public class FSCAN extends DiskSchedulingAlgorithm {
         Collections.sort(leftRequests, Collections.reverseOrder());
         
         int position = startPosition;
+        boolean movingRight = isInitialDirectionRight();
         
-        // Service right side first
-        for (int cyl : rightRequests) {
-            // Check for new arrivals while moving
+        // Service based on initial direction
+        List<Integer> firstPass = movingRight ? rightRequests : leftRequests;
+        List<Integer> secondPass = movingRight ? leftRequests : rightRequests;
+        
+        for (int cyl : firstPass) {
             collectArrivals(holdingQueue, pendingRequests);
-            
             movement += Math.abs(position - cyl);
-            currentTime += Math.abs(position - cyl); // Time advances with movement
+            currentTime += Math.abs(position - cyl);
             position = cyl;
             logServiceWithTime(position, "FSCAN", currentTime);
         }
         
-        // Then service left side
-        for (int cyl : leftRequests) {
+        for (int cyl : secondPass) {
             collectArrivals(holdingQueue, pendingRequests);
-            
             movement += Math.abs(position - cyl);
             currentTime += Math.abs(position - cyl);
             position = cyl;
@@ -216,13 +223,17 @@ public class FSCAN extends DiskSchedulingAlgorithm {
         
         Collections.sort(leftRequests, Collections.reverseOrder());
         
-        for (int req : rightRequests) {
+        boolean movingRight = isInitialDirectionRight();
+        List<Integer> firstPass = movingRight ? rightRequests : leftRequests;
+        List<Integer> secondPass = movingRight ? leftRequests : rightRequests;
+        
+        for (int req : firstPass) {
             movement += Math.abs(position - req);
             position = req;
             logService(position, "FSCAN");
         }
         
-        for (int req : leftRequests) {
+        for (int req : secondPass) {
             movement += Math.abs(position - req);
             position = req;
             logService(position, "FSCAN");
