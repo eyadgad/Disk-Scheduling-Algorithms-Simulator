@@ -18,30 +18,53 @@ public class LOOK extends DiskSchedulingAlgorithm {
         Collections.sort(localRequests);
         int position = initialPosition;
         boolean movingRight = isInitialDirectionRight();
-
-        while (!localRequests.isEmpty()) {
-            final int curPosition = position;
-            if (localRequests.contains(position)) {
-                logService(position, "LOOK");
-                localRequests.remove(Integer.valueOf(position));
-            }
-
-            if (movingRight) {
-                Integer nextRequest = localRequests.stream().filter(req -> req > curPosition).findFirst().orElse(null);
-                if (nextRequest == null) {
-                    movingRight = false;
-                } else {
-                    movement += Math.abs(position - nextRequest);
-                    position = nextRequest;
-                }
+        
+        // Separate requests into left and right of initial position
+        List<Integer> leftRequests = new ArrayList<>();
+        List<Integer> rightRequests = new ArrayList<>();
+        
+        for (int req : localRequests) {
+            if (req < position) {
+                leftRequests.add(req);
+            } else if (req > position) {
+                rightRequests.add(req);
             } else {
-                Integer nextRequest = localRequests.stream().filter(req -> req < curPosition).findFirst().orElse(null);
-                if (nextRequest == null) {
-                    movingRight = true;
-                } else {
-                    movement += Math.abs(position - nextRequest);
-                    position = nextRequest;
-                }
+                // Request at current position - service immediately
+                logService(position, "LOOK");
+            }
+        }
+        
+        // Sort: right ascending, left descending (for reverse traversal)
+        Collections.sort(rightRequests);
+        Collections.sort(leftRequests, Collections.reverseOrder());
+        
+        if (movingRight) {
+            // Service right side first
+            for (int req : rightRequests) {
+                movement += req - position;
+                position = req;
+                logService(position, "LOOK");
+            }
+            
+            // Then reverse and service left side (no need to go to boundary - that's LOOK)
+            for (int req : leftRequests) {
+                movement += position - req;
+                position = req;
+                logService(position, "LOOK");
+            }
+        } else {
+            // Service left side first
+            for (int req : leftRequests) {
+                movement += position - req;
+                position = req;
+                logService(position, "LOOK");
+            }
+            
+            // Then reverse and service right side
+            for (int req : rightRequests) {
+                movement += req - position;
+                position = req;
+                logService(position, "LOOK");
             }
         }
 
