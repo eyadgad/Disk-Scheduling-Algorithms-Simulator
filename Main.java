@@ -1,8 +1,21 @@
 import java.util.*;
-import java.util.logging.Logger;
+import java.util.logging.*;
 
 public class Main {
     private static final Logger logger = Logger.getLogger(Main.class.getName());
+    
+    static {
+        // Configure simple log format (message only, no timestamps)
+        Logger rootLogger = Logger.getLogger("");
+        for (Handler handler : rootLogger.getHandlers()) {
+            handler.setFormatter(new java.util.logging.Formatter() {
+                @Override
+                public String format(LogRecord record) {
+                    return record.getMessage() + "\n";
+                }
+            });
+        }
+    }
     
     // All available algorithm names
     private static final String[] ALL_ALGORITHMS = {
