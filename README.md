@@ -39,21 +39,25 @@ Ensure you have the following installed:
 ## Directory Structure
 ```
 .
-|-- DiskSchedulingAlgorithm.java   # Abstract class for disk scheduling algorithms
-|-- DiskConfig.java                # Configuration class for disk parameters
-|-- FCFS.java                      # FCFS implementation
-|-- SSTF.java                      # SSTF implementation
-|-- SCAN.java                      # SCAN implementation
-|-- C_SCAN.java                    # C-SCAN implementation
-|-- LOOK.java                      # LOOK implementation
-|-- C_LOOK.java                    # C-LOOK implementation
-|-- FSCAN.java                     # FSCAN implementation (two rotating queues)
-|-- N_Step_SCAN.java               # N-Step SCAN implementation
-|-- Request.java                   # Request class with cylinder and arrival time
-|-- WorkloadGenerator.java         # Workload generator with distributions
-|-- Main.java                      # Entry point for CLI application
-|-- DiskSchedulerGUI.java          # Swing-based graphical user interface
-|-- .gitignore                     # Git ignore file for .class files
+|-- README.md                      # This file
+|-- LICENSE                        # License file
+|-- src/                           # Source code directory
+|   |-- Main.java                  # Entry point for CLI application
+|   |-- DiskSchedulerGUI.java      # Swing-based graphical user interface
+|   |-- DiskSchedulingAlgorithm.java  # Abstract base class for algorithms
+|   |-- DiskConfig.java            # Configuration class for disk parameters
+|   |-- SimulationConfig.java      # Simulation configuration settings
+|   |-- AlgorithmResult.java       # Result container with metrics
+|   |-- Request.java               # Request class with cylinder and arrival time
+|   |-- WorkloadGenerator.java     # Workload generator with distributions
+|   |-- FCFS.java                  # First-Come-First-Serve implementation
+|   |-- SSTF.java                  # Shortest Seek Time First implementation
+|   |-- SCAN.java                  # SCAN (Elevator) implementation
+|   |-- C_SCAN.java                # Circular SCAN implementation
+|   |-- LOOK.java                  # LOOK implementation
+|   |-- C_LOOK.java                # Circular LOOK implementation
+|   |-- FSCAN.java                 # Freeze SCAN implementation
+|   |-- N_Step_SCAN.java           # N-Step SCAN implementation
 ```
 
 ---
@@ -66,22 +70,32 @@ Ensure you have the following installed:
    ```
 
 2. **Compile the Source Code**:
-   Navigate to the `src` directory and compile all Java files:
+   Compile all Java files from the project root:
    ```bash
-   javac *.java
+   javac -d out src/*.java
    ```
+   This compiles all source files and places the class files in the `out/` directory.
 
-3. **Run the Program**:
-   Execute the command-line program using:
+3. **Run the Command-Line Program**:
+   Execute the CLI program:
    ```bash
-   java Main
+   java -cp out Main
    ```
 
 4. **Run the Graphical User Interface (GUI)**:
    Launch the Swing-based GUI application:
    ```bash
-   java DiskSchedulerGUI
+   java -cp out DiskSchedulerGUI
    ```
+
+### Alternative: Compile and Run In-Place
+You can also compile and run directly in the `src/` directory:
+```bash
+cd src
+javac *.java
+java Main           # Run CLI
+java DiskSchedulerGUI  # Run GUI
+```
 
 ---
 
@@ -103,18 +117,18 @@ The simulator includes a Java Swing-based GUI for easy interaction without comma
 +------------------------------------------------------------------+
 | Configuration:                                                    |
 |   Lower Cylinder Bound: [0    ]  Upper Cylinder Bound: [4999   ]  |
-|   Initial Head Position: [1000 ]  Initial Direction: [RIGHT ▼]   |
-|   Algorithm: [FCFS                                           ▼]  |
+|   Initial Head Position: [1000 ]  Initial Direction: [RIGHT v]   |
+|   Algorithm: [FCFS                                           v]  |
 |   Request List: [2069, 98, 183, 37, 122, 14, 124, 65, 67...]     |
 +------------------------------------------------------------------+
 | Simulation Results:                                               |
-|   ╔════════════════════════════════════════════════════════════╗  |
-|   ║         DISK SCHEDULING SIMULATION RESULTS                 ║  |
-|   ╠════════════════════════════════════════════════════════════╣  |
-|   ║   ★ TOTAL HEAD MOVEMENT: 12582                             ║  |
-|   ║   Average Seek Distance: 699.00                            ║  |
-|   ║   Service Order: [2069, 98, 183, ...]                      ║  |
-|   ╚════════════════════════════════════════════════════════════╝  |
+|   +============================================================+  |
+|   |         DISK SCHEDULING SIMULATION RESULTS                 |  |
+|   +------------------------------------------------------------+  |
+|   |   >>> TOTAL HEAD MOVEMENT: 12582                           |  |
+|   |   Average Seek Distance: 699.00                            |  |
+|   |   Service Order: [2069, 98, 183, ...]                      |  |
+|   +============================================================+  |
 +------------------------------------------------------------------+
 |        [Run Simulation]  [Clear Results]  [Reset Defaults]        |
 +------------------------------------------------------------------+

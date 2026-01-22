@@ -348,39 +348,39 @@ public class DiskSchedulerGUI extends JFrame {
         StringBuilder sb = new StringBuilder();
         AlgorithmResult.Metrics metrics = result.getMetrics();
         
-        // Header
-        sb.append("╔════════════════════════════════════════════════════════════════╗\n");
-        sb.append("║              DISK SCHEDULING SIMULATION RESULTS                ║\n");
-        sb.append("╠════════════════════════════════════════════════════════════════╣\n");
+        // Header (using ASCII characters for compatibility)
+        sb.append("+==================================================================+\n");
+        sb.append("|              DISK SCHEDULING SIMULATION RESULTS                 |\n");
+        sb.append("+==================================================================+\n");
         
         // Configuration summary
-        sb.append("║ Configuration:                                                 ║\n");
-        sb.append(String.format("║   Algorithm: %-50s ║\n", result.getAlgorithmName()));
-        sb.append(String.format("║   Cylinder Range: [%d, %d]%-36s ║\n", 
+        sb.append("| Configuration:                                                  |\n");
+        sb.append(String.format("|   Algorithm: %-51s |\n", result.getAlgorithmName()));
+        sb.append(String.format("|   Cylinder Range: [%d, %d]%-37s |\n", 
                   config.getLowerCylinder(), config.getUpperCylinder(), ""));
-        sb.append(String.format("║   Initial Position: %-44d ║\n", initialPosition));
-        sb.append(String.format("║   Initial Direction: %-43s ║\n", config.getInitialDirection()));
-        sb.append(String.format("║   Number of Requests: %-42d ║\n", requests.size()));
+        sb.append(String.format("|   Initial Position: %-45d |\n", initialPosition));
+        sb.append(String.format("|   Initial Direction: %-44s |\n", config.getInitialDirection()));
+        sb.append(String.format("|   Number of Requests: %-43d |\n", requests.size()));
         
-        sb.append("╠════════════════════════════════════════════════════════════════╣\n");
+        sb.append("+------------------------------------------------------------------+\n");
         
         // Main result
-        sb.append("║ RESULTS:                                                       ║\n");
-        sb.append("╠════════════════════════════════════════════════════════════════╣\n");
-        sb.append(String.format("║   ★ TOTAL HEAD MOVEMENT: %-38d ║\n", result.getTotalMovement()));
-        sb.append("╠════════════════════════════════════════════════════════════════╣\n");
+        sb.append("| RESULTS:                                                        |\n");
+        sb.append("+------------------------------------------------------------------+\n");
+        sb.append(String.format("|   >>> TOTAL HEAD MOVEMENT: %-37d |\n", result.getTotalMovement()));
+        sb.append("+------------------------------------------------------------------+\n");
         
         // Seek statistics
-        sb.append("║ Seek Statistics:                                               ║\n");
-        sb.append(String.format("║   Average Seek Distance: %-38.2f ║\n", metrics.avgSeek));
-        sb.append(String.format("║   Maximum Seek Distance: %-38d ║\n", metrics.maxSeek));
-        sb.append(String.format("║   Minimum Seek Distance: %-38d ║\n", metrics.minSeek));
-        sb.append(String.format("║   Seek Std Deviation: %-41.2f ║\n", metrics.seekStdDev));
+        sb.append("| Seek Statistics:                                                |\n");
+        sb.append(String.format("|   Average Seek Distance: %-39.2f |\n", metrics.avgSeek));
+        sb.append(String.format("|   Maximum Seek Distance: %-39d |\n", metrics.maxSeek));
+        sb.append(String.format("|   Minimum Seek Distance: %-39d |\n", metrics.minSeek));
+        sb.append(String.format("|   Seek Std Deviation: %-42.2f |\n", metrics.seekStdDev));
         
-        sb.append("╠════════════════════════════════════════════════════════════════╣\n");
+        sb.append("+------------------------------------------------------------------+\n");
         
         // Service order
-        sb.append("║ Service Order:                                                 ║\n");
+        sb.append("| Service Order:                                                  |\n");
         List<Integer> serviceOrder = result.getServiceOrder();
         String orderStr = serviceOrder.toString();
         // Wrap long lines
@@ -388,26 +388,26 @@ public class DiskSchedulerGUI extends JFrame {
         while (orderStr.length() > maxLineLen) {
             int breakPoint = orderStr.lastIndexOf(',', maxLineLen);
             if (breakPoint < 0) breakPoint = maxLineLen;
-            sb.append(String.format("║   %-62s ║\n", orderStr.substring(0, breakPoint + 1)));
+            sb.append(String.format("|   %-63s |\n", orderStr.substring(0, breakPoint + 1)));
             orderStr = orderStr.substring(breakPoint + 1).trim();
         }
-        sb.append(String.format("║   %-62s ║\n", orderStr));
+        sb.append(String.format("|   %-63s |\n", orderStr));
         
-        sb.append("╠════════════════════════════════════════════════════════════════╣\n");
+        sb.append("+------------------------------------------------------------------+\n");
         
         // Head path  
-        sb.append("║ Head Path:                                                     ║\n");
+        sb.append("| Head Path:                                                      |\n");
         List<Integer> headPath = result.getHeadPath();
         String pathStr = headPath.toString();
         while (pathStr.length() > maxLineLen) {
             int breakPoint = pathStr.lastIndexOf(',', maxLineLen);
             if (breakPoint < 0) breakPoint = maxLineLen;
-            sb.append(String.format("║   %-62s ║\n", pathStr.substring(0, breakPoint + 1)));
+            sb.append(String.format("|   %-63s |\n", pathStr.substring(0, breakPoint + 1)));
             pathStr = pathStr.substring(breakPoint + 1).trim();
         }
-        sb.append(String.format("║   %-62s ║\n", pathStr));
+        sb.append(String.format("|   %-63s |\n", pathStr));
         
-        sb.append("╚════════════════════════════════════════════════════════════════╝\n");
+        sb.append("+==================================================================+\n");
         
         resultArea.setText(sb.toString());
         resultArea.setCaretPosition(0);
