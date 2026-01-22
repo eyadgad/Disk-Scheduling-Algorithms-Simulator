@@ -7,13 +7,17 @@ public class LOOK extends DiskSchedulingAlgorithm {
     public LOOK(List<Integer> requests, int initialPosition) {
         super(requests, initialPosition);
     }
+    
+    public LOOK(List<Integer> requests, int initialPosition, DiskConfig config) {
+        super(requests, initialPosition, config);
+    }
 
     @Override
     public int execute() {
         List<Integer> localRequests = new ArrayList<>(requests);
         Collections.sort(localRequests);
         int position = initialPosition;
-        boolean movingRight = true;
+        boolean movingRight = isInitialDirectionRight();
 
         while (!localRequests.isEmpty()) {
             final int curPosition = position;
