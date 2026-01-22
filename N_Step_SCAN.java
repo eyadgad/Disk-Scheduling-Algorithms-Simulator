@@ -74,6 +74,11 @@ public class N_Step_SCAN extends DiskSchedulingAlgorithm {
     public int getStepSize() {
         return stepSize;
     }
+    
+    @Override
+    public String getAlgorithmName() {
+        return "N_Step_SCAN (N=" + stepSize + ")";
+    }
 
     @Override
     public int execute() {
