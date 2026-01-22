@@ -6,6 +6,10 @@ public class SSTF extends DiskSchedulingAlgorithm {
     public SSTF(List<Integer> requests, int initialPosition) {
         super(requests, initialPosition);
     }
+    
+    public SSTF(List<Integer> requests, int initialPosition, DiskConfig config) {
+        super(requests, initialPosition, config);
+    }
 
     @Override
     public int execute() {
