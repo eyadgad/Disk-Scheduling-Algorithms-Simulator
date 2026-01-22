@@ -38,7 +38,13 @@ public class Main {
         boolean showSimpleTimeline = false;
         boolean showServiceOrder = false;
         boolean showPath = false;
+        boolean showMetrics = false;
         boolean quietMode = false;  // Suppress per-service logging
+        
+        // Benchmark mode
+        boolean benchmarkMode = false;
+        int benchmarkIterations = 5;
+        int[] benchmarkSizes = {100, 500, 1000, 5000};
 
         // Parse command-line arguments
         for (int i = 0; i < args.length; i++) {
@@ -157,6 +163,25 @@ public class Main {
                         showTimeline = true;
                         showServiceOrder = true;
                         showPath = true;
+                        showMetrics = true;
+                        break;
+                    case "--metrics":
+                        showMetrics = true;
+                        break;
+                    // Benchmark mode
+                    case "--benchmark":
+                        benchmarkMode = true;
+                        quietMode = true;  // Suppress individual service logs
+                        break;
+                    case "--benchmark-iterations":
+                        benchmarkIterations = Integer.parseInt(args[++i]);
+                        break;
+                    case "--benchmark-sizes":
+                        List<Integer> sizes = new ArrayList<>();
+                        for (int j = i + 1; j < args.length && !args[j].startsWith("-"); j++, i++) {
+                            sizes.add(Integer.parseInt(args[j]));
+                        }
+                        benchmarkSizes = sizes.stream().mapToInt(Integer::intValue).toArray();
                         break;
                     case "-h":
                     case "--help":
@@ -265,9 +290,12 @@ public class Main {
         
         // Create output options
         OutputOptions outputOpts = new OutputOptions(showTimeline, showSimpleTimeline, 
-                                                      showServiceOrder, showPath);
+                                                      showServiceOrder, showPath, showMetrics);
 
-        if (isBatchMode) {
+        if (benchmarkMode) {
+            runBenchmark(simConfig, selectedAlgorithms, seed, distribution, 
+                        benchmarkIterations, benchmarkSizes);
+        } else if (isBatchMode) {
             batchExecution(simConfig, selectedAlgorithms, outputOpts);
         } else if (timeBasedMode && generatedRequests != null) {
             executeAlgorithmsTimeBased(generatedRequests, initialPosition, simConfig, selectedAlgorithms, outputOpts);
@@ -286,12 +314,14 @@ public class Main {
         final boolean showSimpleTimeline;
         final boolean showServiceOrder;
         final boolean showPath;
+        final boolean showMetrics;
         
-        OutputOptions(boolean timeline, boolean simpleTl, boolean order, boolean path) {
+        OutputOptions(boolean timeline, boolean simpleTl, boolean order, boolean path, boolean metrics) {
             this.showTimeline = timeline;
             this.showSimpleTimeline = simpleTl;
             this.showServiceOrder = order;
             this.showPath = path;
+            this.showMetrics = metrics;
         }
     }
     
@@ -341,18 +371,30 @@ public class Main {
         System.out.println("  --simple-timeline      Show simple inline timeline");
         System.out.println("  --show-order           Show service order");
         System.out.println("  --show-path            Show full head path");
+        System.out.println("  --metrics              Show detailed metrics report");
         System.out.println("  -q, --quiet            Suppress per-service logging");
-        System.out.println("  -v, --verbose          Show all output (timeline, order, path)");
+        System.out.println("  -v, --verbose          Show all output (timeline, order, path, metrics)");
+        System.out.println();
+        System.out.println("Benchmark Mode:");
+        System.out.println("  --benchmark            Run benchmark with large randomized workloads");
+        System.out.println("  --benchmark-iterations <n>  Number of iterations per size (default: 5)");
+        System.out.println("  --benchmark-sizes <list>    Workload sizes to test (default: 100 500 1000 5000)");
+        System.out.println();
+        System.out.println("Metrics Tracked:");
+        System.out.println("  - Total/Average/Max/Min seek distance");
+        System.out.println("  - Per-request latency (with arrival times)");
+        System.out.println("  - Throughput (requests per time unit)");
+        System.out.println("  - Fairness Index (Jain's fairness, 1.0 = perfectly fair)");
+        System.out.println("  - Execution time");
         System.out.println();
         System.out.println("Examples:");
         System.out.println("  java Main -r 100 200 300 400 -i 250");
-        System.out.println("  java Main -g -s 12345 -d NORMAL -c 30");
+        System.out.println("  java Main -g -s 12345 -d NORMAL -c 30 --metrics");
         System.out.println("  java Main --lower 0 --upper 999 -i 500 --direction LEFT");
         System.out.println("  java Main -a SCAN C_SCAN LOOK -r 100 200 300");
-        System.out.println("  java Main --wrap FIRST -a C_LOOK -r 100 500 200");
-        System.out.println("  java Main -g -s 42 -d HOTSPOT -c 25 -t 1000");
-        System.out.println("  java Main -r 100 200 800 -i 500 --timeline --show-order");
-        System.out.println("  java Main -r 100 500 200 -q --simple-timeline");
+        System.out.println("  java Main -g -s 42 -d HOTSPOT -c 25 -t 1000 --metrics");
+        System.out.println("  java Main --benchmark -s 12345 -d UNIFORM");
+        System.out.println("  java Main --benchmark --benchmark-sizes 100 1000 10000 -a SSTF LOOK");
     }
 
     private static void executeAlgorithms(List<Integer> requests, int initialPosition, 
@@ -406,10 +448,17 @@ public class Main {
     
     private static void displayResult(AlgorithmResult result, OutputOptions opts) {
         String name = result.getAlgorithmName();
+        AlgorithmResult.Metrics m = result.getMetrics();
         
         // Basic result
         logger.info(name + " Total Movement: " + result.getTotalMovement());
-        logger.info("  Average Seek: " + String.format("%.2f", result.getAverageSeekDistance()) + " cylinders");
+        logger.info(String.format("  Seek - Avg: %.2f, Max: %d, Min: %d", 
+                    m.avgSeek, m.maxSeek, m.minSeek));
+        
+        if (m.avgLatency > 0) {
+            logger.info(String.format("  Latency - Avg: %.2f, Max: %d", m.avgLatency, m.maxLatency));
+            logger.info(String.format("  Throughput: %.4f, Fairness: %.4f", m.throughput, m.fairnessIndex));
+        }
         
         // Optional outputs
         if (opts.showServiceOrder) {
@@ -418,6 +467,10 @@ public class Main {
         
         if (opts.showPath) {
             logger.info("  Head Path: " + result.getHeadPath());
+        }
+        
+        if (opts.showMetrics) {
+            System.out.println(result.getMetricsReport());
         }
         
         if (opts.showSimpleTimeline) {
@@ -432,40 +485,251 @@ public class Main {
     }
     
     private static void displayComparisonSummary(List<AlgorithmResult> results) {
-        logger.info("\n╔══════════════════════════════════════════════════════════════╗");
-        logger.info("║                    COMPARISON SUMMARY                        ║");
-        logger.info("╠══════════════════════════════════════════════════════════════╣");
+        boolean hasLatency = results.stream().anyMatch(r -> r.getMetrics().avgLatency > 0);
         
-        // Find best algorithm
-        AlgorithmResult best = results.get(0);
+        logger.info("\n+========================================================================================+");
+        logger.info("|                                   COMPARISON SUMMARY                                   |");
+        logger.info("+========================================================================================+");
+        
+        // Find best algorithm by movement
+        AlgorithmResult bestMovement = results.get(0);
+        AlgorithmResult bestFairness = results.get(0);
         for (AlgorithmResult r : results) {
-            if (r.getTotalMovement() < best.getTotalMovement()) {
-                best = r;
+            if (r.getTotalMovement() < bestMovement.getTotalMovement()) {
+                bestMovement = r;
+            }
+            if (r.getMetrics().fairnessIndex > bestFairness.getMetrics().fairnessIndex) {
+                bestFairness = r;
             }
         }
         
-        // Display table
-        logger.info(String.format("║ %-20s │ %10s │ %10s │ %8s ║", 
-                    "Algorithm", "Movement", "Avg Seek", "vs Best"));
-        logger.info("╟──────────────────────┼────────────┼────────────┼──────────╢");
+        // Display table header
+        if (hasLatency) {
+            logger.info(String.format("| %-18s | %8s | %7s | %7s | %8s | %8s | %7s |", 
+                        "Algorithm", "Movement", "AvgSeek", "MaxSeek", "AvgLat", "Fairness", "vsBest"));
+            logger.info("+--------------------+----------+---------+---------+----------+----------+---------+");
+        } else {
+            logger.info(String.format("| %-22s | %10s | %10s | %10s | %10s |", 
+                        "Algorithm", "Movement", "Avg Seek", "Max Seek", "vs Best"));
+            logger.info("+------------------------+------------+------------+------------+------------+");
+        }
         
         for (AlgorithmResult r : results) {
+            AlgorithmResult.Metrics m = r.getMetrics();
             String vsPercent;
-            if (r == best) {
+            if (r == bestMovement) {
                 vsPercent = "BEST";
             } else {
-                double pct = ((double) r.getTotalMovement() / best.getTotalMovement() - 1) * 100;
+                double pct = ((double) r.getTotalMovement() / bestMovement.getTotalMovement() - 1) * 100;
                 vsPercent = String.format("+%.1f%%", pct);
             }
             
-            logger.info(String.format("║ %-20s │ %10d │ %10.2f │ %8s ║",
-                        r.getAlgorithmName(),
-                        r.getTotalMovement(),
-                        r.getAverageSeekDistance(),
-                        vsPercent));
+            if (hasLatency) {
+                logger.info(String.format("| %-18s | %8d | %7.1f | %7d | %8.1f | %8.4f | %7s |",
+                            truncate(r.getAlgorithmName(), 18),
+                            r.getTotalMovement(),
+                            m.avgSeek,
+                            m.maxSeek,
+                            m.avgLatency,
+                            m.fairnessIndex,
+                            vsPercent));
+            } else {
+                logger.info(String.format("| %-22s | %10d | %10.2f | %10d | %10s |",
+                            truncate(r.getAlgorithmName(), 22),
+                            r.getTotalMovement(),
+                            m.avgSeek,
+                            m.maxSeek,
+                            vsPercent));
+            }
         }
         
-        logger.info("╚══════════════════════════════════════════════════════════════╝");
+        if (hasLatency) {
+            logger.info("+========================================================================================+");
+            logger.info(String.format("| Best Movement: %-25s  Best Fairness: %-25s |",
+                        truncate(bestMovement.getAlgorithmName(), 25),
+                        truncate(bestFairness.getAlgorithmName(), 25)));
+        }
+        
+        logger.info("+========================================================================================+");
+    }
+    
+    private static String truncate(String s, int maxLen) {
+        if (s.length() <= maxLen) return s;
+        return s.substring(0, maxLen - 2) + "..";
+    }
+    
+    /**
+     * Run benchmark mode with large randomized workloads.
+     */
+    private static void runBenchmark(SimulationConfig simConfig, Set<String> selectedAlgorithms,
+                                      long seed, WorkloadGenerator.Distribution distribution,
+                                      int iterations, int[] sizes) {
+        logger.info("\n+==================================================================================+");
+        logger.info("|                              BENCHMARK MODE                                      |");
+        logger.info("+==================================================================================+\n");
+        
+        logger.info("Configuration:");
+        logger.info("  Seed: " + seed);
+        logger.info("  Distribution: " + distribution);
+        logger.info("  Iterations per size: " + iterations);
+        logger.info("  Workload sizes: " + Arrays.toString(sizes));
+        logger.info("  Algorithms: " + selectedAlgorithms);
+        logger.info("");
+        
+        DiskConfig diskConfig = simConfig.getDiskConfig();
+        int nStepSize = simConfig.getNStepSize();
+        
+        // Results storage: size -> algorithm -> list of results
+        Map<Integer, Map<String, List<AlgorithmResult>>> allResults = new LinkedHashMap<>();
+        
+        for (int size : sizes) {
+            allResults.put(size, new LinkedHashMap<>());
+            for (String algo : ALL_ALGORITHMS) {
+                if (selectedAlgorithms.contains(algo)) {
+                    allResults.get(size).put(algo, new ArrayList<>());
+                }
+            }
+        }
+        
+        // Run benchmarks
+        for (int size : sizes) {
+            logger.info("Running benchmark with " + size + " requests...");
+            
+            for (int iter = 0; iter < iterations; iter++) {
+                long iterSeed = seed + iter * 1000L + size;
+                WorkloadGenerator generator = new WorkloadGenerator(iterSeed, 
+                    diskConfig.getLowerCylinder(), diskConfig.getUpperCylinder());
+                
+                // Generate workload with arrival times for latency measurement
+                List<Request> requests = generator.generateWithPoissonArrivals(size, distribution, 10.0);
+                
+                List<Integer> cylinders = new ArrayList<>();
+                for (Request req : requests) {
+                    cylinders.add(req.getCylinder());
+                }
+                
+                // Random initial position
+                int initialPos = diskConfig.getLowerCylinder() + 
+                    new Random(iterSeed).nextInt(diskConfig.getUpperCylinder() - diskConfig.getLowerCylinder());
+                
+                // Create and run algorithms
+                List<DiskSchedulingAlgorithm> algorithms = createAlgorithms(
+                    cylinders, requests, initialPos, simConfig, selectedAlgorithms, true);
+                
+                for (DiskSchedulingAlgorithm algo : algorithms) {
+                    AlgorithmResult result = algo.executeWithResult();
+                    String algoName = getBaseAlgorithmName(algo);
+                    allResults.get(size).get(algoName).add(result);
+                }
+            }
+        }
+        
+        // Display benchmark results
+        displayBenchmarkResults(allResults, sizes, selectedAlgorithms);
+    }
+    
+    private static String getBaseAlgorithmName(DiskSchedulingAlgorithm algo) {
+        String name = algo.getClass().getSimpleName();
+        // Normalize N_Step_SCAN to just the base name for grouping
+        return name;
+    }
+    
+    private static void displayBenchmarkResults(Map<Integer, Map<String, List<AlgorithmResult>>> allResults,
+                                                  int[] sizes, Set<String> selectedAlgorithms) {
+        logger.info("\n");
+        logger.info("+============================================================================================================+");
+        logger.info("|                                         BENCHMARK RESULTS                                                 |");
+        logger.info("+============================================================================================================+");
+        
+        // Header
+        StringBuilder header = new StringBuilder();
+        header.append(String.format("| %-16s |", "Algorithm"));
+        for (int size : sizes) {
+            header.append(String.format(" %10s |", size + " reqs"));
+        }
+        header.append(" Notes");
+        logger.info(header.toString());
+        
+        logger.info("+------------------+" + repeatStr("------------+", sizes.length) + "-------------------------------------");
+        
+        // Results for each algorithm
+        for (String algoName : ALL_ALGORITHMS) {
+            if (!selectedAlgorithms.contains(algoName)) continue;
+            
+            StringBuilder row = new StringBuilder();
+            row.append(String.format("| %-16s |", truncate(algoName, 16)));
+            
+            double[] avgMovements = new double[sizes.length];
+            int idx = 0;
+            
+            for (int size : sizes) {
+                List<AlgorithmResult> results = allResults.get(size).get(algoName);
+                if (results != null && !results.isEmpty()) {
+                    // Calculate average metrics
+                    double avgMove = results.stream().mapToInt(AlgorithmResult::getTotalMovement).average().orElse(0);
+                    avgMovements[idx] = avgMove;
+                    row.append(String.format(" %10.0f |", avgMove));
+                } else {
+                    row.append(String.format(" %10s |", "N/A"));
+                }
+                idx++;
+            }
+            
+            // Add scaling note
+            if (avgMovements.length >= 2 && avgMovements[0] > 0) {
+                double scaleFactor = avgMovements[avgMovements.length - 1] / avgMovements[0];
+                double sizeScale = (double) sizes[sizes.length - 1] / sizes[0];
+                String scaling;
+                if (scaleFactor < sizeScale * 0.5) {
+                    scaling = "Sub-linear [OK]";
+                } else if (scaleFactor < sizeScale * 1.5) {
+                    scaling = "Linear";
+                } else {
+                    scaling = "Super-linear";
+                }
+                row.append(" ").append(scaling);
+            }
+            
+            logger.info(row.toString());
+        }
+        
+        logger.info("+============================================================================================================+");
+        
+        // Detailed metrics for largest workload
+        int largestSize = sizes[sizes.length - 1];
+        logger.info("| Detailed Metrics for " + largestSize + " requests (averages):                                                             |");
+        logger.info("+------------------+----------+----------+----------+----------+----------+--------------------------------");
+        logger.info(String.format("| %-16s | %8s | %8s | %8s | %8s | %8s | %8s", 
+                    "Algorithm", "AvgSeek", "MaxSeek", "AvgLat", "MaxLat", "Fairness", "Time(ms)"));
+        logger.info("+------------------+----------+----------+----------+----------+----------+--------------------------------");
+        
+        for (String algoName : ALL_ALGORITHMS) {
+            if (!selectedAlgorithms.contains(algoName)) continue;
+            
+            List<AlgorithmResult> results = allResults.get(largestSize).get(algoName);
+            if (results == null || results.isEmpty()) continue;
+            
+            // Average all metrics
+            double avgSeek = results.stream().mapToDouble(r -> r.getMetrics().avgSeek).average().orElse(0);
+            double maxSeek = results.stream().mapToDouble(r -> r.getMetrics().maxSeek).average().orElse(0);
+            double avgLat = results.stream().mapToDouble(r -> r.getMetrics().avgLatency).average().orElse(0);
+            double maxLat = results.stream().mapToDouble(r -> r.getMetrics().maxLatency).average().orElse(0);
+            double fairness = results.stream().mapToDouble(r -> r.getMetrics().fairnessIndex).average().orElse(0);
+            double execTime = results.stream().mapToDouble(r -> r.getMetrics().executionTimeMs).average().orElse(0);
+            
+            logger.info(String.format("| %-16s | %8.1f | %8.0f | %8.1f | %8.0f | %8.4f | %8.3f",
+                        truncate(algoName, 16), avgSeek, maxSeek, avgLat, maxLat, fairness, execTime));
+        }
+        
+        logger.info("+============================================================================================================+");
+    }
+    
+    private static String repeatStr(String s, int n) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            sb.append(s);
+        }
+        return sb.toString();
     }
     
     private static List<DiskSchedulingAlgorithm> createAlgorithms(
