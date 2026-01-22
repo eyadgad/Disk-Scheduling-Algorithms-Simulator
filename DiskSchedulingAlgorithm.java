@@ -26,6 +26,10 @@ public abstract class DiskSchedulingAlgorithm {
     protected List<Integer> serviceOrder;       // Order of serviced requests
     protected List<Integer> headPath;           // Full path of head movement
     protected List<Long> serviceTimes;          // Service times for time-based mode
+    protected List<Long> arrivalTimes;          // Arrival times for latency calculation
+    protected List<Integer> seekDistances;      // Individual seek distances
+    protected long executionStartTime;          // For wall-clock timing
+    protected long executionEndTime;
 
     protected static final Logger logger = Logger.getLogger(DiskSchedulingAlgorithm.class.getName());
 
@@ -124,6 +128,10 @@ public abstract class DiskSchedulingAlgorithm {
         this.serviceOrder = new ArrayList<>();
         this.headPath = new ArrayList<>();
         this.serviceTimes = new ArrayList<>();
+        this.arrivalTimes = new ArrayList<>();
+        this.seekDistances = new ArrayList<>();
+        this.executionStartTime = 0;
+        this.executionEndTime = 0;
         // Record initial position in path
         this.headPath.add(initialPosition);
     }
@@ -147,8 +155,13 @@ public abstract class DiskSchedulingAlgorithm {
         // Reset state in case of re-execution
         resetState();
         
+        // Track execution time
+        executionStartTime = System.nanoTime();
+        
         // Execute the algorithm
         execute();
+        
+        executionEndTime = System.nanoTime();
         
         // Build and return result
         return buildResult();
@@ -158,14 +171,31 @@ public abstract class DiskSchedulingAlgorithm {
      * Build the AlgorithmResult from current state.
      */
     protected AlgorithmResult buildResult() {
+        // Collect arrival times from requests if in time-based mode
+        List<Long> arrivals = new ArrayList<>();
+        if (timeBasedMode && requestsWithTime != null) {
+            for (int cyl : serviceOrder) {
+                // Find the request with this cylinder that was serviced
+                for (Request req : requestsWithTime) {
+                    if (req.getCylinder() == cyl && !arrivals.contains(req.getArrivalTime())) {
+                        arrivals.add(req.getArrivalTime());
+                        break;
+                    }
+                }
+            }
+        }
+        
         return new AlgorithmResult(
             getAlgorithmName(),
             initialPosition,
             movement,
             serviceOrder,
             headPath,
-            timeBasedMode ? serviceTimes : null,
-            config
+            serviceTimes,
+            arrivals.isEmpty() ? arrivalTimes : arrivals,
+            seekDistances,
+            config,
+            executionEndTime - executionStartTime
         );
     }
     
@@ -221,6 +251,15 @@ public abstract class DiskSchedulingAlgorithm {
      * Record a service event and log it.
      */
     protected void recordService(int position, String algorithmName) {
+        // Track seek distance
+        if (!headPath.isEmpty()) {
+            int lastPos = headPath.get(headPath.size() - 1);
+            int seekDist = Math.abs(position - lastPos);
+            if (seekDist > 0) {
+                seekDistances.add(seekDist);
+            }
+        }
+        
         serviceOrder.add(position);
         headPath.add(position);
         if (timeBasedMode) {
@@ -235,6 +274,15 @@ public abstract class DiskSchedulingAlgorithm {
      * Record a service event with time and log it.
      */
     protected void recordServiceWithTime(int position, String algorithmName, long time) {
+        // Track seek distance
+        if (!headPath.isEmpty()) {
+            int lastPos = headPath.get(headPath.size() - 1);
+            int seekDist = Math.abs(position - lastPos);
+            if (seekDist > 0) {
+                seekDistances.add(seekDist);
+            }
+        }
+        
         serviceOrder.add(position);
         headPath.add(position);
         serviceTimes.add(time);
@@ -247,7 +295,22 @@ public abstract class DiskSchedulingAlgorithm {
      * Record head movement to a position (without servicing a request).
      */
     protected void recordHeadMove(int position) {
+        // Track seek distance for non-service moves too
+        if (!headPath.isEmpty()) {
+            int lastPos = headPath.get(headPath.size() - 1);
+            int seekDist = Math.abs(position - lastPos);
+            if (seekDist > 0) {
+                seekDistances.add(seekDist);
+            }
+        }
         headPath.add(position);
+    }
+    
+    /**
+     * Record arrival time for a request (for latency tracking).
+     */
+    protected void recordArrival(long arrivalTime) {
+        arrivalTimes.add(arrivalTime);
     }
     
     // Legacy log methods - still work but prefer recordService
