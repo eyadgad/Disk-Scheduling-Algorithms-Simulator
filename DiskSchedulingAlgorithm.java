@@ -12,6 +12,7 @@ public abstract class DiskSchedulingAlgorithm {
     
     // Configuration
     protected DiskConfig config;
+    protected SimulationConfig simConfig;
     
     // Request data
     protected List<Integer> requests;           // Legacy: cylinder numbers only
@@ -20,6 +21,11 @@ public abstract class DiskSchedulingAlgorithm {
     protected int movement;
     protected long currentTime;                 // Current simulated time
     protected boolean timeBasedMode;            // Whether to use time-based scheduling
+    
+    // Result tracking
+    protected List<Integer> serviceOrder;       // Order of serviced requests
+    protected List<Integer> headPath;           // Full path of head movement
+    protected List<Long> serviceTimes;          // Service times for time-based mode
 
     protected static final Logger logger = Logger.getLogger(DiskSchedulingAlgorithm.class.getName());
 
@@ -45,16 +51,27 @@ public abstract class DiskSchedulingAlgorithm {
     }
     
     /**
-     * Constructor with cylinder numbers and custom config.
+     * Constructor with cylinder numbers and custom DiskConfig.
      */
     public DiskSchedulingAlgorithm(List<Integer> requests, int initialPosition, DiskConfig config) {
         this.config = config != null ? config : DiskConfig.getDefault();
+        this.simConfig = new SimulationConfig(this.config);
         this.requests = requests;
         this.requestsWithTime = WorkloadGenerator.fromCylinders(requests);
         this.initialPosition = initialPosition;
-        this.movement = 0;
-        this.currentTime = 0;
-        this.timeBasedMode = false;
+        initializeState();
+    }
+    
+    /**
+     * Constructor with SimulationConfig.
+     */
+    public DiskSchedulingAlgorithm(List<Integer> requests, int initialPosition, SimulationConfig simConfig) {
+        this.simConfig = simConfig != null ? simConfig : new SimulationConfig();
+        this.config = this.simConfig.getDiskConfig();
+        this.requests = requests;
+        this.requestsWithTime = WorkloadGenerator.fromCylinders(requests);
+        this.initialPosition = initialPosition;
+        initializeState();
     }
     
     /**
@@ -65,23 +82,92 @@ public abstract class DiskSchedulingAlgorithm {
     }
     
     /**
-     * Full constructor with Request objects and custom config.
+     * Full constructor with Request objects and custom DiskConfig.
      */
     public DiskSchedulingAlgorithm(List<Request> requests, int initialPosition, 
                                     boolean timeBasedMode, DiskConfig config) {
         this.config = config != null ? config : DiskConfig.getDefault();
+        this.simConfig = new SimulationConfig(this.config);
         this.requestsWithTime = new ArrayList<>(requests);
         this.requests = new ArrayList<>();
         for (Request req : requests) {
             this.requests.add(req.getCylinder());
         }
         this.initialPosition = initialPosition;
+        this.timeBasedMode = timeBasedMode;
+        initializeState();
+    }
+    
+    /**
+     * Constructor with Request objects and SimulationConfig.
+     */
+    public DiskSchedulingAlgorithm(List<Request> requests, int initialPosition, 
+                                    boolean timeBasedMode, SimulationConfig simConfig) {
+        this.simConfig = simConfig != null ? simConfig : new SimulationConfig();
+        this.config = this.simConfig.getDiskConfig();
+        this.requestsWithTime = new ArrayList<>(requests);
+        this.requests = new ArrayList<>();
+        for (Request req : requests) {
+            this.requests.add(req.getCylinder());
+        }
+        this.initialPosition = initialPosition;
+        this.timeBasedMode = timeBasedMode;
+        initializeState();
+    }
+    
+    /**
+     * Initialize tracking state.
+     */
+    private void initializeState() {
         this.movement = 0;
         this.currentTime = 0;
-        this.timeBasedMode = timeBasedMode;
+        this.serviceOrder = new ArrayList<>();
+        this.headPath = new ArrayList<>();
+        this.serviceTimes = new ArrayList<>();
+        // Record initial position in path
+        this.headPath.add(initialPosition);
+    }
+    
+    /**
+     * Reset state for re-execution.
+     */
+    protected void resetState() {
+        initializeState();
     }
 
+    /**
+     * Execute the algorithm and return total movement (legacy).
+     */
     public abstract int execute();
+    
+    /**
+     * Execute the algorithm and return structured result.
+     */
+    public AlgorithmResult executeWithResult() {
+        // Reset state in case of re-execution
+        resetState();
+        
+        // Execute the algorithm
+        execute();
+        
+        // Build and return result
+        return buildResult();
+    }
+    
+    /**
+     * Build the AlgorithmResult from current state.
+     */
+    protected AlgorithmResult buildResult() {
+        return new AlgorithmResult(
+            getAlgorithmName(),
+            initialPosition,
+            movement,
+            serviceOrder,
+            headPath,
+            timeBasedMode ? serviceTimes : null,
+            config
+        );
+    }
     
     /**
      * Get the algorithm name for display.
@@ -131,12 +217,46 @@ public abstract class DiskSchedulingAlgorithm {
         return config.isMovingRight();
     }
 
+    /**
+     * Record a service event and log it.
+     */
+    protected void recordService(int position, String algorithmName) {
+        serviceOrder.add(position);
+        headPath.add(position);
+        if (timeBasedMode) {
+            serviceTimes.add(currentTime);
+        }
+        if (simConfig.isVerbose()) {
+            logger.info("(" + algorithmName + ") Servicing at: " + position);
+        }
+    }
+    
+    /**
+     * Record a service event with time and log it.
+     */
+    protected void recordServiceWithTime(int position, String algorithmName, long time) {
+        serviceOrder.add(position);
+        headPath.add(position);
+        serviceTimes.add(time);
+        if (simConfig.isVerbose()) {
+            logger.info("(" + algorithmName + ") Time=" + time + " Servicing at: " + position);
+        }
+    }
+    
+    /**
+     * Record head movement to a position (without servicing a request).
+     */
+    protected void recordHeadMove(int position) {
+        headPath.add(position);
+    }
+    
+    // Legacy log methods - still work but prefer recordService
     protected void logService(int position, String algorithmName) {
-        logger.info("(" + algorithmName + ") Servicing at: " + position);
+        recordService(position, algorithmName);
     }
     
     protected void logServiceWithTime(int position, String algorithmName, long time) {
-        logger.info("(" + algorithmName + ") Time=" + time + " Servicing at: " + position);
+        recordServiceWithTime(position, algorithmName, time);
     }
     
     public int getMovement() {
@@ -149,5 +269,17 @@ public abstract class DiskSchedulingAlgorithm {
     
     public DiskConfig getConfig() {
         return config;
+    }
+    
+    public SimulationConfig getSimConfig() {
+        return simConfig;
+    }
+    
+    public List<Integer> getServiceOrder() {
+        return new ArrayList<>(serviceOrder);
+    }
+    
+    public List<Integer> getHeadPath() {
+        return new ArrayList<>(headPath);
     }
 }
