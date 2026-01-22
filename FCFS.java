@@ -5,6 +5,10 @@ public class FCFS extends DiskSchedulingAlgorithm {
     public FCFS(List<Integer> requests, int initialPosition) {
         super(requests, initialPosition);
     }
+    
+    public FCFS(List<Integer> requests, int initialPosition, DiskConfig config) {
+        super(requests, initialPosition, config);
+    }
 
     @Override
     public int execute() {
