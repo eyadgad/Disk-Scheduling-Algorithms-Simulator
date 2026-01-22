@@ -28,7 +28,7 @@ public class N_Step_SCAN extends DiskSchedulingAlgorithm {
      * Constructor with default step size of 4
      */
     public N_Step_SCAN(List<Integer> requests, int initialPosition) {
-        this(requests, initialPosition, 4); // Default N = 4
+        this(requests, initialPosition, 4);
     }
     
     /**
@@ -36,7 +36,15 @@ public class N_Step_SCAN extends DiskSchedulingAlgorithm {
      */
     public N_Step_SCAN(List<Integer> requests, int initialPosition, int stepSize) {
         super(requests, initialPosition);
-        this.stepSize = Math.max(1, stepSize); // Ensure N >= 1
+        this.stepSize = Math.max(1, stepSize);
+    }
+    
+    /**
+     * Constructor with custom config
+     */
+    public N_Step_SCAN(List<Integer> requests, int initialPosition, int stepSize, DiskConfig config) {
+        super(requests, initialPosition, config);
+        this.stepSize = Math.max(1, stepSize);
     }
     
     /**
@@ -51,6 +59,15 @@ public class N_Step_SCAN extends DiskSchedulingAlgorithm {
      */
     public N_Step_SCAN(List<Request> requests, int initialPosition, boolean timeBasedMode, int stepSize) {
         super(requests, initialPosition, timeBasedMode);
+        this.stepSize = Math.max(1, stepSize);
+    }
+    
+    /**
+     * Full constructor with time-based mode, step size, and config
+     */
+    public N_Step_SCAN(List<Request> requests, int initialPosition, boolean timeBasedMode, 
+                        int stepSize, DiskConfig config) {
+        super(requests, initialPosition, timeBasedMode, config);
         this.stepSize = Math.max(1, stepSize);
     }
     
@@ -163,17 +180,19 @@ public class N_Step_SCAN extends DiskSchedulingAlgorithm {
         Collections.sort(leftRequests, Collections.reverseOrder());
         
         int position = startPosition;
+        boolean movingRight = isInitialDirectionRight();
         
-        // Service right side first
-        for (int cyl : rightRequests) {
+        List<Integer> firstPass = movingRight ? rightRequests : leftRequests;
+        List<Integer> secondPass = movingRight ? leftRequests : rightRequests;
+        
+        for (int cyl : firstPass) {
             movement += Math.abs(position - cyl);
             currentTime += Math.abs(position - cyl);
             position = cyl;
             logServiceWithTime(position, "N-Step SCAN", currentTime);
         }
         
-        // Then service left side
-        for (int cyl : leftRequests) {
+        for (int cyl : secondPass) {
             movement += Math.abs(position - cyl);
             currentTime += Math.abs(position - cyl);
             position = cyl;
@@ -205,13 +224,17 @@ public class N_Step_SCAN extends DiskSchedulingAlgorithm {
         
         Collections.sort(leftRequests, Collections.reverseOrder());
         
-        for (int req : rightRequests) {
+        boolean movingRight = isInitialDirectionRight();
+        List<Integer> firstPass = movingRight ? rightRequests : leftRequests;
+        List<Integer> secondPass = movingRight ? leftRequests : rightRequests;
+        
+        for (int req : firstPass) {
             movement += Math.abs(position - req);
             position = req;
             logService(position, "N-Step SCAN");
         }
         
-        for (int req : leftRequests) {
+        for (int req : secondPass) {
             movement += Math.abs(position - req);
             position = req;
             logService(position, "N-Step SCAN");
