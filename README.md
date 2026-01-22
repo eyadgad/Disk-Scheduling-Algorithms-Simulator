@@ -17,12 +17,16 @@ The simulator allows testing these algorithms with custom requests, initial head
 ## Features
 - **Algorithms**: Implements and evaluates FCFS, SSTF, SCAN, C-SCAN, LOOK, C-LOOK, FSCAN, and N-Step SCAN.
 - **Custom Input**: Accepts custom disk requests and initial head position via command-line arguments.
+- **Configurable Disk Geometry**: Set custom cylinder bounds (min/max).
+- **Configurable Sweep Direction**: Choose initial head direction (LEFT/RIGHT).
+- **Configurable Wrap Policy**: Choose wrap behavior for circular algorithms (C-SCAN, C-LOOK).
+- **Algorithm Selection**: Run specific algorithms or all algorithms.
 - **Batch Mode**: Allows batch testing with multiple request sets and initial positions.
 - **Workload Generator**: Generate requests with different distributions (uniform, normal, hotspot).
 - **Reproducible Runs**: Use a seed for reproducible random workload generation.
 - **Time-Based Scheduling**: Support for request arrival times with FSCAN and N-Step SCAN.
 - **Movement Calculation**: Logs the servicing order and calculates total head movements.
-- **Custom Logging**: Provides simplified, clean output without timestamps or extra details.
+- **Input Validation**: Validates all parameters with helpful error messages.
 
 ---
 
@@ -36,6 +40,7 @@ Ensure you have the following installed:
 ```
 .
 ├── DiskSchedulingAlgorithm.java   # Abstract class for disk scheduling algorithms
+├── DiskConfig.java                # Configuration class for disk parameters
 ├── FCFS.java                      # FCFS implementation
 ├── SSTF.java                      # SSTF implementation
 ├── SCAN.java                      # SCAN implementation
@@ -47,6 +52,7 @@ Ensure you have the following installed:
 ├── Request.java                   # Request class with cylinder and arrival time
 ├── WorkloadGenerator.java         # Workload generator with distributions
 ├── Main.java                      # Entry point for the application
+├── .gitignore                     # Git ignore file for .class files
 ```
 
 ---
@@ -84,6 +90,28 @@ You can pass the following arguments to customize the simulation:
 | `-b`, `--batch` | Enable batch testing mode | false |
 | `-h`, `--help` | Show help message | - |
 
+#### Disk Configuration Options
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--min-cylinder`, `--lower` | Lower cylinder bound | 0 |
+| `--max-cylinder`, `--upper` | Upper cylinder bound | 4999 |
+| `--direction`, `--dir` | Initial sweep direction: `LEFT` or `RIGHT` | RIGHT |
+| `--wrap`, `--wrap-policy` | Wrap policy: `START` or `FIRST` | START |
+
+**Direction Aliases**: `L`/`R`, `UP`/`DOWN`, `INCREASING`/`DECREASING`
+
+**Wrap Policies**:
+- `START` (or `BOUNDARY`): Wrap to disk boundary (traditional C-SCAN/C-LOOK)
+- `FIRST` (or `FIRST_REQ`): Jump directly to first request in new direction
+
+#### Algorithm Selection Options
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-a`, `--algorithms` | Space-separated list of algorithms to run | All |
+| `--list-algorithms` | List all available algorithms | - |
+
+**Available Algorithms**: `FCFS`, `SSTF`, `SCAN`, `C_SCAN`, `LOOK`, `C_LOOK`, `FSCAN`, `N_STEP_SCAN`
+
 #### Workload Generation Options
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -115,35 +143,66 @@ You can pass the following arguments to customize the simulation:
    ```
    This tests multiple scenarios with predefined request sets and initial positions.
 
-4. **Generate Uniform Workload with Seed**:
+4. **Custom Disk Geometry**:
+   ```bash
+   java Main --lower 0 --upper 999 -i 500 -r 100 200 800 900
+   ```
+   Simulates a disk with cylinders 0-999.
+
+5. **Custom Initial Direction**:
+   ```bash
+   java Main --direction LEFT -r 100 200 800 -i 500
+   ```
+   Start the head moving left (toward lower cylinders).
+
+6. **Custom Wrap Policy**:
+   ```bash
+   java Main --wrap FIRST -a C_LOOK -r 100 500 200
+   ```
+   C-LOOK jumps directly to first request when wrapping.
+
+7. **Select Specific Algorithms**:
+   ```bash
+   java Main -a SCAN C_SCAN LOOK -r 100 200 300
+   ```
+   Only run SCAN, C-SCAN, and LOOK algorithms.
+
+8. **Generate Uniform Workload with Seed**:
    ```bash
    java Main -g -s 12345 -d UNIFORM -c 30
    ```
    Generates 30 requests with uniform distribution using seed 12345.
 
-5. **Generate Normal Distribution Workload**:
+9. **Generate Normal Distribution Workload**:
    ```bash
    java Main -g -s 42 -d NORMAL -c 25 -i 2500
    ```
    Generates 25 requests centered around the middle of the disk.
 
-6. **Generate Hotspot Workload**:
-   ```bash
-   java Main -g -s 100 -d HOTSPOT -c 40
-   ```
-   Generates 40 requests clustered around hotspot regions (500, 2500, 4000).
+10. **Generate Hotspot Workload**:
+    ```bash
+    java Main -g -s 100 -d HOTSPOT -c 40
+    ```
+    Generates 40 requests clustered around hotspot regions (500, 2500, 4000).
 
-7. **Time-Based Scheduling**:
-   ```bash
-   java Main -g -s 42 -d UNIFORM -c 20 -t 1000
-   ```
-   Generates 20 requests with arrival times spread over 1000 time units.
+11. **Time-Based Scheduling**:
+    ```bash
+    java Main -g -s 42 -d UNIFORM -c 20 -t 1000
+    ```
+    Generates 20 requests with arrival times spread over 1000 time units.
 
-8. **Custom N-Step SCAN Size**:
-   ```bash
-   java Main -g -s 42 -c 24 -n 6
-   ```
-   Uses N=6 for N-Step SCAN algorithm.
+12. **Custom N-Step SCAN Size**:
+    ```bash
+    java Main -g -s 42 -c 24 -n 6
+    ```
+    Uses N=6 for N-Step SCAN algorithm.
+
+13. **Combined Options**:
+    ```bash
+    java Main --lower 0 --upper 9999 --direction LEFT --wrap FIRST \
+              -g -s 42 -d HOTSPOT -c 50 -a SCAN C_SCAN FSCAN
+    ```
+    Full example with custom disk, direction, wrap policy, workload, and algorithm selection.
 
 ### Distribution Types
 
@@ -253,4 +312,24 @@ Use `WorkloadGenerator` to create reproducible workloads:
 WorkloadGenerator gen = new WorkloadGenerator(12345); // seed
 List<Request> requests = gen.generate(20, Distribution.HOTSPOT, 1000);
 ```
+
+### DiskConfig Class
+Configure disk geometry and scheduling behavior:
+```java
+DiskConfig config = new DiskConfig();
+config.setDiskBounds(0, 9999);                           // Custom disk size
+config.setInitialDirection(DiskConfig.Direction.LEFT);   // Start moving left
+config.setWrapPolicy(DiskConfig.WrapPolicy.WRAP_TO_FIRST_REQ); // Jump to first request
+
+// Use with algorithms
+SCAN scan = new SCAN(requests, initialPosition, config);
+```
+
+**Direction Options**:
+- `Direction.RIGHT` - Move toward higher cylinder numbers (default)
+- `Direction.LEFT` - Move toward lower cylinder numbers
+
+**Wrap Policy Options** (for C-SCAN/C-LOOK):
+- `WrapPolicy.WRAP_TO_START` - Wrap to disk boundary (default)
+- `WrapPolicy.WRAP_TO_FIRST_REQ` - Jump directly to first request
 
