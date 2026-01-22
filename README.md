@@ -39,20 +39,20 @@ Ensure you have the following installed:
 ## Directory Structure
 ```
 .
-├── DiskSchedulingAlgorithm.java   # Abstract class for disk scheduling algorithms
-├── DiskConfig.java                # Configuration class for disk parameters
-├── FCFS.java                      # FCFS implementation
-├── SSTF.java                      # SSTF implementation
-├── SCAN.java                      # SCAN implementation
-├── C_SCAN.java                    # C-SCAN implementation
-├── LOOK.java                      # LOOK implementation
-├── C_LOOK.java                    # C-LOOK implementation
-├── FSCAN.java                     # FSCAN implementation (two rotating queues)
-├── N_Step_SCAN.java               # N-Step SCAN implementation
-├── Request.java                   # Request class with cylinder and arrival time
-├── WorkloadGenerator.java         # Workload generator with distributions
-├── Main.java                      # Entry point for the application
-├── .gitignore                     # Git ignore file for .class files
+|-- DiskSchedulingAlgorithm.java   # Abstract class for disk scheduling algorithms
+|-- DiskConfig.java                # Configuration class for disk parameters
+|-- FCFS.java                      # FCFS implementation
+|-- SSTF.java                      # SSTF implementation
+|-- SCAN.java                      # SCAN implementation
+|-- C_SCAN.java                    # C-SCAN implementation
+|-- LOOK.java                      # LOOK implementation
+|-- C_LOOK.java                    # C-LOOK implementation
+|-- FSCAN.java                     # FSCAN implementation (two rotating queues)
+|-- N_Step_SCAN.java               # N-Step SCAN implementation
+|-- Request.java                   # Request class with cylinder and arrival time
+|-- WorkloadGenerator.java         # Workload generator with distributions
+|-- Main.java                      # Entry point for the application
+|-- .gitignore                     # Git ignore file for .class files
 ```
 
 ---
@@ -122,6 +122,34 @@ You can pass the following arguments to customize the simulation:
 | `-t`, `--time-span` | Max arrival time span (enables time-based mode) | 0 |
 | `--time-based` | Enable time-based scheduling mode | false |
 | `-n`, `--n-step` | Step size N for N-Step SCAN | 4 |
+
+#### Output Options
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--timeline` | Show ASCII timeline visualization | false |
+| `--simple-timeline` | Show simple inline timeline | false |
+| `--show-order` | Show service order | false |
+| `--show-path` | Show full head path | false |
+| `--metrics` | Show detailed metrics report | false |
+| `-q`, `--quiet` | Suppress per-service logging | false |
+| `-v`, `--verbose` | Show all output (timeline, order, path, metrics) | false |
+
+#### Benchmark Mode
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--benchmark` | Run benchmark with large randomized workloads | false |
+| `--benchmark-iterations` | Number of iterations per workload size | 5 |
+| `--benchmark-sizes` | Space-separated workload sizes to test | 100 500 1000 5000 |
+
+### Metrics Tracked
+
+The simulator tracks comprehensive metrics for each algorithm:
+
+- **Seek Distance**: Average, maximum, minimum, and standard deviation
+- **Response Latency**: Time from request arrival to service (with arrival times)
+- **Throughput**: Requests serviced per time unit
+- **Fairness Index**: Jain's fairness index (1.0 = perfectly fair, lower = less fair)
+- **Execution Time**: Wall-clock time for algorithm execution
 
 ### Examples
 
@@ -203,6 +231,25 @@ You can pass the following arguments to customize the simulation:
               -g -s 42 -d HOTSPOT -c 50 -a SCAN C_SCAN FSCAN
     ```
     Full example with custom disk, direction, wrap policy, workload, and algorithm selection.
+
+14. **Show Detailed Metrics**:
+    ```bash
+    java Main -g -s 42 -c 20 -t 500 --metrics
+    ```
+    Shows comprehensive metrics including latency, throughput, and fairness.
+
+15. **Run Benchmark**:
+    ```bash
+    java Main --benchmark -s 12345 -d UNIFORM
+    ```
+    Runs benchmark with workloads of 100, 500, 1000, and 5000 requests.
+
+16. **Custom Benchmark Sizes**:
+    ```bash
+    java Main --benchmark --benchmark-sizes 50 200 1000 5000 10000 \
+              --benchmark-iterations 10 -a SSTF LOOK SCAN
+    ```
+    Benchmark specific algorithms with custom workload sizes.
 
 ### Distribution Types
 
