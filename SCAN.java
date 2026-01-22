@@ -7,13 +7,20 @@ public class SCAN extends DiskSchedulingAlgorithm {
     public SCAN(List<Integer> requests, int initialPosition) {
         super(requests, initialPosition);
     }
+    
+    public SCAN(List<Integer> requests, int initialPosition, DiskConfig config) {
+        super(requests, initialPosition, config);
+    }
 
     @Override
     public int execute() {
         List<Integer> localRequests = new ArrayList<>(requests);
         Collections.sort(localRequests);
         int position = initialPosition;
-        boolean movingRight = true;
+        boolean movingRight = isInitialDirectionRight();
+        
+        int upperBound = getUpperCylinder();
+        int lowerBound = getLowerCylinder();
 
         while (!localRequests.isEmpty()) {
             if (localRequests.contains(position)) {
@@ -22,13 +29,13 @@ public class SCAN extends DiskSchedulingAlgorithm {
             }
 
             if (movingRight) {
-                if (position < UPPER_CYLINDER) {
+                if (position < upperBound) {
                     position++;
                 } else {
                     movingRight = false;
                 }
             } else {
-                if (position > LOWER_CYLINDER) {
+                if (position > lowerBound) {
                     position--;
                 } else {
                     movingRight = true;
