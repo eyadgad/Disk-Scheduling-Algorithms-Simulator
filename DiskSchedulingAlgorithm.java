@@ -6,8 +6,14 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
 public abstract class DiskSchedulingAlgorithm {
-    protected static final int LOWER_CYLINDER = 0;
-    protected static final int UPPER_CYLINDER = 4999;
+    // Legacy constants for backward compatibility
+    protected static final int LOWER_CYLINDER = DiskConfig.DEFAULT_LOWER_CYLINDER;
+    protected static final int UPPER_CYLINDER = DiskConfig.DEFAULT_UPPER_CYLINDER;
+    
+    // Configuration
+    protected DiskConfig config;
+    
+    // Request data
     protected List<Integer> requests;           // Legacy: cylinder numbers only
     protected List<Request> requestsWithTime;   // New: requests with arrival times
     protected int initialPosition;
@@ -32,9 +38,17 @@ public abstract class DiskSchedulingAlgorithm {
     }
     
     /**
-     * Legacy constructor using cylinder numbers only.
+     * Legacy constructor using cylinder numbers only with default config.
      */
     public DiskSchedulingAlgorithm(List<Integer> requests, int initialPosition) {
+        this(requests, initialPosition, DiskConfig.getDefault());
+    }
+    
+    /**
+     * Constructor with cylinder numbers and custom config.
+     */
+    public DiskSchedulingAlgorithm(List<Integer> requests, int initialPosition, DiskConfig config) {
+        this.config = config != null ? config : DiskConfig.getDefault();
         this.requests = requests;
         this.requestsWithTime = WorkloadGenerator.fromCylinders(requests);
         this.initialPosition = initialPosition;
@@ -44,9 +58,18 @@ public abstract class DiskSchedulingAlgorithm {
     }
     
     /**
-     * New constructor using Request objects with arrival times.
+     * Constructor using Request objects with arrival times and default config.
      */
     public DiskSchedulingAlgorithm(List<Request> requests, int initialPosition, boolean timeBasedMode) {
+        this(requests, initialPosition, timeBasedMode, DiskConfig.getDefault());
+    }
+    
+    /**
+     * Full constructor with Request objects and custom config.
+     */
+    public DiskSchedulingAlgorithm(List<Request> requests, int initialPosition, 
+                                    boolean timeBasedMode, DiskConfig config) {
+        this.config = config != null ? config : DiskConfig.getDefault();
         this.requestsWithTime = new ArrayList<>(requests);
         this.requests = new ArrayList<>();
         for (Request req : requests) {
@@ -59,6 +82,13 @@ public abstract class DiskSchedulingAlgorithm {
     }
 
     public abstract int execute();
+    
+    /**
+     * Get the algorithm name for display.
+     */
+    public String getAlgorithmName() {
+        return getClass().getSimpleName();
+    }
     
     /**
      * Get requests that have arrived by the current time.
@@ -87,6 +117,19 @@ public abstract class DiskSchedulingAlgorithm {
             currentTime = nextArrival;
         }
     }
+    
+    // Convenience methods to access config bounds
+    protected int getLowerCylinder() {
+        return config.getLowerCylinder();
+    }
+    
+    protected int getUpperCylinder() {
+        return config.getUpperCylinder();
+    }
+    
+    protected boolean isInitialDirectionRight() {
+        return config.isMovingRight();
+    }
 
     protected void logService(int position, String algorithmName) {
         logger.info("(" + algorithmName + ") Servicing at: " + position);
@@ -102,5 +145,9 @@ public abstract class DiskSchedulingAlgorithm {
     
     public long getCurrentTime() {
         return currentTime;
+    }
+    
+    public DiskConfig getConfig() {
+        return config;
     }
 }
